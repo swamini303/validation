@@ -81,7 +81,7 @@ if uploaded_file:
 
     st.success(f"CSV loaded successfully! {total} queries found.")
     df['Search URL'] = search_urls
-    st.dataframe(df[['Account Name', 'Parent Name', 'Search URL']].head(10), use_container_width=True)
+    st.dataframe(df[['Account Name', 'Parent Name', 'Search URL']], use_container_width=True)
 
     st.markdown("---")
 
