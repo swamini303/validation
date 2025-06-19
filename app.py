@@ -5,28 +5,14 @@ import urllib.parse
 import time
 import shutil
 import os
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Subsidiary Search Automation", page_icon="🔍", layout="centered")
 
 st.title("🔍 Subsidiary Search Automation")
 st.markdown("""
-Upload your CSV file with columns **Account Name** and **Parent Name**. Select the range of queries you want to open in Chrome tabs.
+Upload your CSV file with columns **Account Name** and **Parent Name**. The application will generate Google search links for you.
 """)
-
-# Try to register Chrome as the browser
-CHROME_PATHS = [
-    shutil.which('chrome'),
-    shutil.which('chrome.exe'),
-    r'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    r'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    os.path.expandvars(r'%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe'),
-]
-chrome_path = next((p for p in CHROME_PATHS if p and shutil.which(p) or (p and os.path.exists(p))), None)
-if chrome_path:
-    webbrowser.register('chrome', None, webbrowser.BackgroundBrowser(chrome_path))
-    BROWSER = 'chrome'
-else:
-    BROWSER = None
 
 def create_search_query(account_name, parent_name):
     return f"Is {account_name} a subsidiary of the {parent_name}?"
@@ -34,18 +20,6 @@ def create_search_query(account_name, parent_name):
 def create_google_search_url(query):
     encoded_query = urllib.parse.quote_plus(query)
     return f"https://www.google.com/search?q={encoded_query}"
-
-def open_search_in_browser(url, delay=1):
-    try:
-        if BROWSER:
-            webbrowser.get(BROWSER).open_new_tab(url)
-        else:
-            webbrowser.open_new_tab(url)
-        time.sleep(delay)
-        return True
-    except Exception as e:
-        st.error(f"Failed to open URL: {url}. Error: {e}")
-        return False
 
 uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 
@@ -82,24 +56,48 @@ if uploaded_file:
     total = len(search_urls)
 
     st.success(f"CSV loaded successfully! {total} queries found.")
-    st.dataframe(df[['Account Name', 'Parent Name']].head(10), use_container_width=True)
+    df['Search URL'] = search_urls
+    st.dataframe(df[['Account Name', 'Parent Name', 'Search URL']].head(10), use_container_width=True)
 
     st.markdown("---")
-    st.subheader("Select Range to Open in Chrome Tabs")
-    col1, col2 = st.columns(2)
-    with col1:
-        start = st.number_input("Start Index (1-based)", min_value=1, max_value=total, value=1, step=1)
-    with col2:
-        end = st.number_input("End Index (inclusive, 1-based)", min_value=1, max_value=total, value=min(10, total), step=1)
 
-    if start > end:
-        st.warning("Start index cannot be greater than end index.")
-    else:
-        if st.button(f"Open Searches {start} to {end} in Chrome Tabs", type="primary"):
-            with st.spinner(f"Opening searches {start} to {end} in Chrome tabs..."):
-                for i, url in enumerate(search_urls[start-1:end], start):
-                    open_search_in_browser(url, delay=1)
-                st.success(f"Opened searches {start} to {end} in Chrome tabs!")
-                st.info("If tabs did not open, make sure Chrome is installed and set as your default browser.")
+    # Initialize session state for selections
+    if 'selections' not in st.session_state or len(st.session_state.get('selections', [])) != total:
+        st.session_state.selections = [False] * total
+
+    def update_selections(select_all):
+        st.session_state.selections = [select_all] * total
+
+    st.subheader("Manage and Open Links")
+    
+    col1, col2, col3 = st.columns([1, 1, 2])
+    col1.button("Select All", on_click=update_selections, args=(True,), use_container_width=True)
+    col2.button("Deselect All", on_click=update_selections, args=(False,), use_container_width=True)
+
+    if col3.button("Open Selected Links", use_container_width=True, type="primary"):
+        selected_urls = [search_urls[i] for i, s in enumerate(st.session_state.selections) if s]
+        if selected_urls:
+            js_code = "".join([f"window.open('{url}', '_blank');" for url in selected_urls])
+            components.html(f"<script>{js_code}</script>", height=0)
+            st.success(f"Attempting to open {len(selected_urls)} links.")
+            st.info("If new tabs did not open, please check if your browser is blocking pop-ups and allow them for this site.")
+        else:
+            st.warning("No links were selected to open.")
+
+    st.markdown("---")
+    st.subheader("Generated Search Links")
+
+    for i, (url, query) in enumerate(zip(search_urls, search_queries)):
+        col1, col2 = st.columns([0.1, 3])
+        with col1:
+            st.session_state.selections[i] = st.checkbox(
+                "select", 
+                value=st.session_state.selections[i], 
+                key=f"cb_{i}", 
+                label_visibility="collapsed"
+            )
+        with col2:
+            st.markdown(f"{i+1}. <a href='{url}' target='_blank'>Search for: {query}</a>", unsafe_allow_html=True)
+
 else:
     st.info("Please upload a CSV file to begin.") 
