@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import webbrowser
 import urllib.parse
 import time
@@ -50,6 +51,26 @@ if uploaded_file:
     if not {'Account Name', 'Parent Name'}.issubset(df.columns):
         st.error("CSV must contain 'Account Name' and 'Parent Name' columns.")
         st.stop()
+
+    # --- Data Cleaning ---
+    # Strip whitespace from key columns
+    df['Account Name'] = df['Account Name'].astype(str).str.strip()
+    df['Parent Name'] = df['Parent Name'].astype(str).str.strip()
+
+    # Replace empty strings with NaN for uniform handling
+    df.replace('', np.nan, inplace=True)
+
+    # Drop rows where 'Account Name' or 'Parent Name' is missing
+    df.dropna(subset=['Account Name', 'Parent Name'], inplace=True)
+
+    # Reset index after dropping rows, so iteration is clean
+    df.reset_index(drop=True, inplace=True)
+    
+    # Check if DataFrame is empty after cleaning
+    if df.empty:
+        st.warning("No valid data found after cleaning. Please ensure your file has rows with both 'Account Name' and 'Parent Name' populated.")
+        st.stop()
+    # --- End of Data Cleaning ---
 
     search_queries = [create_search_query(row['Account Name'], row['Parent Name']) for _, row in df.iterrows()]
     search_urls = [create_google_search_url(q) for q in search_queries]
