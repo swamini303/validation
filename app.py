@@ -61,28 +61,63 @@ if uploaded_file:
 
     st.markdown("---")
 
-    # Initialize session state for selections
+    # Initialize session state for selections and range.
+    # This block runs only when a new file is uploaded (total changes) or on first run.
     if 'selections' not in st.session_state or len(st.session_state.get('selections', [])) != total:
         st.session_state.selections = [False] * total
+        st.session_state.start_range = 1
+        st.session_state.end_range = min(10, total)
 
     def update_selections(select_all):
         st.session_state.selections = [select_all] * total
 
     st.subheader("Manage and Open Links")
-    
-    col1, col2, col3 = st.columns([1, 1, 2])
-    col1.button("Select All", on_click=update_selections, args=(True,), use_container_width=True)
-    col2.button("Deselect All", on_click=update_selections, args=(False,), use_container_width=True)
 
-    if col3.button("Open Selected Links", use_container_width=True, type="primary"):
-        selected_urls = [search_urls[i] for i, s in enumerate(st.session_state.selections) if s]
-        if selected_urls:
-            js_code = "".join([f"window.open('{url}', '_blank');" for url in selected_urls])
-            components.html(f"<script>{js_code}</script>", height=0)
-            st.success(f"Attempting to open {len(selected_urls)} links.")
-            st.info("If new tabs did not open, please check if your browser is blocking pop-ups and allow them for this site.")
-        else:
-            st.warning("No links were selected to open.")
+    # --- Option 1: Open by individual selection ---
+    with st.expander("Option 1: Open by Individual Selection", expanded=True):
+        st.markdown("Use checkboxes below to select links, then open them here.")
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            st.button("Select All", on_click=update_selections, args=(True,), use_container_width=True)
+        with col2:
+            st.button("Deselect All", on_click=update_selections, args=(False,), use_container_width=True)
+        with col3:
+            if st.button("Open Selected Links", use_container_width=True, type="primary"):
+                selected_urls = [search_urls[i] for i, s in enumerate(st.session_state.selections) if s]
+                if selected_urls:
+                    js_code = "".join([f"window.open('{url}', '_blank');" for url in selected_urls])
+                    components.html(f"<script>{js_code}</script>", height=0)
+                    st.success(f"Attempting to open {len(selected_urls)} selected links.")
+                    st.info("If new tabs did not open, please check if your browser is blocking pop-ups and allow them for this site.")
+                else:
+                    st.warning("No links were selected to open.")
+
+    # --- Option 2: Open by range ---
+    with st.expander("Option 2: Open a Range of Links"):
+        st.markdown("Directly open a range of links without using checkboxes.")
+        r_col1, r_col2, r_col3 = st.columns([1, 1, 1.5])
+        with r_col1:
+            st.number_input("From link #", min_value=1, max_value=total, step=1, key="start_range")
+        with r_col2:
+            st.number_input("To link #", min_value=1, max_value=total, step=1, key="end_range")
+        with r_col3:
+            st.write("&#8203;") # Vertical alignment hack
+            if st.button("Open Range", use_container_width=True):
+                # Adjust for 0-based indexing for slicing from session state
+                start_idx = st.session_state.start_range - 1
+                end_idx = st.session_state.end_range
+                
+                if start_idx >= end_idx:
+                    st.warning("The 'From' value must be smaller than the 'To' value.")
+                else:
+                    range_urls = search_urls[start_idx:end_idx]
+                    if range_urls:
+                        js_code = "".join([f"window.open('{url}', '_blank');" for url in range_urls])
+                        components.html(f"<script>{js_code}</script>", height=0)
+                        st.success(f"Attempting to open links {st.session_state.start_range} through {st.session_state.end_range}.")
+                        st.info("If pop-ups are blocked, please enable them for this site.")
+                    else:
+                        st.error("Could not find links for the specified range.")
 
     st.markdown("---")
     st.subheader("Generated Search Links")
