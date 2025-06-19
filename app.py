@@ -48,6 +48,9 @@ if uploaded_file:
         st.warning("Check the file preview above and make sure you selected the correct separator and that the file is not empty.")
         st.stop()
 
+    # Strip whitespace from column headers to ensure checks pass
+    df.columns = [col.strip() for col in df.columns]
+
     if not {'Account Name', 'Parent Name'}.issubset(df.columns):
         st.error("CSV must contain 'Account Name' and 'Parent Name' columns.")
         st.stop()
@@ -57,8 +60,8 @@ if uploaded_file:
     df['Account Name'] = df['Account Name'].astype(str).str.strip()
     df['Parent Name'] = df['Parent Name'].astype(str).str.strip()
 
-    # Replace empty strings with NaN for uniform handling
-    df.replace('', np.nan, inplace=True)
+    # Replace empty strings and the string 'nan' (a side-effect of .astype(str)) with a proper NaN value
+    df.replace(['', 'nan', 'Nan', 'NAN'], np.nan, inplace=True)
 
     # Drop rows where 'Account Name' or 'Parent Name' is missing
     df.dropna(subset=['Account Name', 'Parent Name'], inplace=True)
